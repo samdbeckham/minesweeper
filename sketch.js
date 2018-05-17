@@ -1,8 +1,8 @@
-const rows = 36;
+const rows = 35;
 const columns = 70;
 const cellSize = 20;
 const barHeight = 5;
-const initialMines = 250;
+const initialMines = 300;
 const smileySize = 30;
 
 let grid = [];
@@ -12,7 +12,83 @@ let lost = false;
 let won = false;
 
 function setup() {
+  const width = columns * cellSize + 1;
+  const height = rows * cellSize + barHeight + smileySize + cellSize;
+  createCanvas(width, height);
   createGame();
+  noLoop();
+}
+
+function draw() {
+  updateGrid();
+  updateProgress();
+}
+
+function lose() {
+  lost = true;
+  generateCrosses();
+}
+
+function win() {
+  const remainingCells = grid.filter(cell => !cell.revealed && !cell.flagged);
+  remainingCells.forEach(cell => flag(cell));
+  won = true;
+
+  generateGlasses();
+}
+
+function updateGrid() {
+  stroke('#fff');
+  strokeWeight(1);
+  const drawable = grid.filter(cell => cell.touched);
+  drawable.map(cell => {
+    const { x, y, mine, nearby, revealed } = cell;
+    fill(getCellBackground(cell));
+    rect(x, y, cellSize, cellSize);
+
+    if (!revealed) { return }
+
+    if (nearby && !mine) {
+      fill(getNearbyColor(cell.nearby));
+      textStyle('bold');
+      text(nearby, x + 8, y + 15);
+    }
+  });
+}
+
+function updateProgress() {
+  const percentage = Math.floor(revealedCells / (grid.length - initialMines) * 100);
+
+  fill(`hsl(${percentage}, 50%, 50%)`);
+  rect(0, height - barHeight - 1, (width / (grid.length - initialMines)) * revealedCells , barHeight);
+}
+
+function drawGrid() {
+  stroke('#fff');
+  strokeWeight(1);
+  grid.map(cell => {
+    const { x, y } = cell;
+    fill(getCellBackground(cell));
+    rect(x, y, cellSize, cellSize);
+  });
+}
+
+function generateCrosses() {
+  const
+    a = width / 2 - 7,
+    b = smileySize / 2 - 7,
+    c = width / 2 - 2,
+    d = smileySize / 2 - 2,
+    e = width / 2 + 2,
+    f = width / 2 + 7;
+  stroke('#333');
+  strokeWeight(2);
+  noFill();
+  fill('#333');
+  line(a, b, c, d);
+  line(a, d, c, b);
+  line(e, b, f, d);
+  line(e, d, f, b);
 }
 
 function generateGlasses() {
@@ -26,14 +102,12 @@ function generateGlasses() {
 
 function generateSmiley() {
   fill('#eb0');
-  if (lost) { fill('#900'); }
+  stroke('#fff');
+  strokeWeight(1);
   ellipse(width / 2, smileySize / 2, smileySize, smileySize);
-  if (won) { generateGlasses(); }
 }
 
 function createGame() {
-  const width = columns * cellSize + 1;
-  const height = rows * cellSize + barHeight + smileySize + cellSize;
   let c, r;
   let mines = initialMines;
 
@@ -49,7 +123,7 @@ function createGame() {
     }
   }
 
-  while (mines) {
+  while (mines && mines < columns * rows) {
     const position = Math.floor(Math.random() * grid.length);
     if (!grid[position].mine) {
       grid[position].mine = true;
@@ -62,7 +136,8 @@ function createGame() {
   });
 
   resetCells();
-  createCanvas(width, height);
+  drawGrid();
+  generateSmiley();
 }
 
 function resetCells() {
@@ -144,42 +219,6 @@ function reveal(cell) {
   nearbyCells.forEach(cell => reveal(cell));
 }
 
-function lose() {
-  console.log('you lose!');
-  lost = true;
-}
-
-function win() {
-  console.log('you win!');
-  const remainingCells = grid.filter(cell => !cell.revealed && !cell.flagged);
-  remainingCells.forEach(cell => flag(cell));
-  won = true;
-}
-
-function draw() {
-  stroke('#fff');
-  grid.map(cell => {
-    const { x, y, mine, nearby, revealed } = cell;
-    fill(getCellBackground(cell));
-    rect(x, y, cellSize, cellSize);
-
-    if (!revealed) { return }
-
-    if (nearby && !mine) {
-      fill(getNearbyColor(cell.nearby));
-      textStyle('bold');
-      text(nearby, x + 8, y + 15);
-    }
-  });
-
-  const percentage = Math.floor(revealedCells / (grid.length - initialMines) * 100);
-
-  fill(`hsl(${percentage}, 50%, 50%)`);
-  rect(0, height - barHeight - 1, (width / (grid.length - initialMines)) * revealedCells , barHeight);
-
-  generateSmiley();
-}
-
 function flag(cell) {
   if (cell.revealed) { return; }
   if (cell.flagged) {
@@ -191,6 +230,7 @@ function flag(cell) {
       remainingMines --;
     }
   }
+  cell.touched = true;
 }
 
 function areaReveal(cell) {
@@ -215,14 +255,14 @@ function mousePressed() {
     return;
   }
   if (won || lost) { return; }
-  const clickedCell = grid.filter(cell => {
+  const clickedCell = grid.find(cell => {
     return (
       mouseX >= cell.x
       && mouseX < cell.x + cellSize
       && mouseY >= cell.y
       && mouseY < cell.y + cellSize
     );
-  })[0];
+  });
 
   if (clickedCell) {
     if (clickedCell.revealed) {
@@ -238,4 +278,6 @@ function mousePressed() {
       }
     }
   }
+
+  redraw();
 }
